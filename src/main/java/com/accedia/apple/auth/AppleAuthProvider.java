@@ -12,7 +12,7 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -26,7 +26,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 public class AppleAuthProvider {
 
@@ -45,7 +46,7 @@ public class AppleAuthProvider {
     private final long secretLifeInSec;
     private final GenericUrl appleAuthTokenUrl;
     private final String appleAuthAuthorizationUrl;
-    private UserDataDeserializer userDataDeserializer;
+    private final UserDataDeserializer userDataDeserializer;
     private final List<String> appleUserScopes;
     private final String redirectUrl;
     private final HttpTransport httpTransport;
@@ -81,11 +82,11 @@ public class AppleAuthProvider {
                 DEFAULT_APPLE_AUTH_AUTHORIZE_URL,
                 new UserDataDeserializer(),
                 new NetHttpTransport(),
-                new JacksonFactory(),
+                new GsonFactory(),
                 DEFAULT_MAX_TIMEOUT_IN_SEC,
                 secretGenerator,
                 privateKey,
-                () -> Instant.now(),
+                Instant::now,
                 DEFAULT_SECRET_LIFE_IN_SEC,
                 new AppleKeyProvider(),
                 scopes,
@@ -146,7 +147,7 @@ public class AppleAuthProvider {
         this.secretLifeInSec = secretLifeInSec;
         this.userDataDeserializer = userDataDeserializer;
         this.appleUserScopes = scopes != null ? ImmutableList.copyOf(
-                scopes.stream().map(AppleUserScope::getLiteral).collect(Collectors.toList())
+                scopes.stream().map(AppleUserScope::getLiteral).collect(toList())
         ) : null;
         this.appleAuthTokenUrl = new GenericUrl(appleAuthTokenUrl);
         this.jsonFactory = jsonFactory;
@@ -159,7 +160,7 @@ public class AppleAuthProvider {
         this.httpTransport = httpTransport;
 
         Algorithm validationAlg = Algorithm.RSA256(appleKeyProvider);
-        this.jwtVerifier =  JWT.require(validationAlg)
+        this.jwtVerifier = JWT.require(validationAlg)
                 .build();
 
     }
@@ -182,13 +183,13 @@ public class AppleAuthProvider {
                 .setResponseTypes(Arrays.asList("code", "id_token"))
                 .setScopes(appleUserScopes)
                 .setState(state)
-                .set("response_mode", "form_post")//Could be parameterized based on scope.
+                .set("response_mode", "form_post")  //Could be parameterized based on scope.
                 .build();
     }
 
     /**
-     * Makes an authorisation request. Retrieves an User's date from Apple. Use this object to create users or sessions.
-     * @param authCode Received from Apple after successfully redirecting the use.
+     * Makes an authorisation request. Retrieves a User's date from Apple. Use this object to create users or sessions.
+     * @param authCode Received from Apple after successfully redirecting the user.
      * @throws IOException
      */
     public AppleAuthorizationToken makeNewAuthorisationTokenRequest(String authCode) throws IOException {
@@ -201,7 +202,7 @@ public class AppleAuthProvider {
     /**
      * Verifies if a token is valid.
      * Use this method to check daily if the user is still signed in on your app using Apple ID.
-     * @param refreshToken 
+     * @param refreshToken
      * @return
      * @throws IOException
      */
@@ -218,13 +219,13 @@ public class AppleAuthProvider {
         TokenResponse tokenResponse = tokenRequest.execute();
         Optional<String> idToken = Optional.ofNullable(tokenResponse.get("id_token")).map(Object::toString);
         idToken.ifPresent(this::validateToken);
-        Optional<UserData> userData = idToken.map(userDataDeserializer::getUserDataFromIdToken);
+        UserData userData = idToken.map(userDataDeserializer::getUserDataFromIdToken).orElse(null);
         return new AppleAuthorizationToken(
                 tokenResponse.getAccessToken(),
                 tokenResponse.getExpiresInSeconds(),
                 idToken.orElse(null),
                 tokenResponse.getRefreshToken(),
-                userData.orElse(null));
+                userData);
     }
 
     private void validateToken(String token) {

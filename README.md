@@ -14,7 +14,7 @@ Next, you have to configure your web page for Sign in with Apple. Follow the gui
 # Example
 ## Using `AppleAuthProvider.java` `AppleClientPrivateKeyFactory.java`
 First order of business should be creating an instance of `ECPrivateKey` representing the client's(your) private key.<br/>
-`AppleKeyProvider` can help you create a `ECPrivateKey` if you have your private key as string or stream (from a p8 for example).
+`AppleClientPrivateKeyFactory` can help you create a `ECPrivateKey` if you have your private key as string or stream (from a p8 for example).
 
 Creating a new instance of `AppleAuthProvider`, should be trivial at this point. The only two parameters that are not 
 self explanatory are the `SecretGenerator` and the collection of scopes.<br/>
@@ -30,10 +30,10 @@ Once you have your `AppleAuthProvider` instance you can:
 ## Handling initial response from Apple
 After the user clicks on the "Sign in with Apple" button on your page they will be redirected to https://appleid.apple.com/. 
 After they provide their credentials Apple will make a POST request to the url that you have specified as Redirect URL. 
-It will contain a ```code``` field. Its contents is what should be handed down to `makeNewAuthorisationTokenRequest` in order retrieve thee authorization token (it will also contain the state used to create the redirect url).
+It will contain a `code` field. Its contents is what should be handed down to `makeNewAuthorisationTokenRequest` in order retrieve the authorization token (it will also contain the state used to create the redirect url).
 Keep in mind that tokens returned from Apple are short-lived, so you should create a session or a user in your system 
-using the returned ```AppleAuthorizationToken``` object. After that you can verify if the user is 
-still logged in using "Sign in with Apple" by retrieving a refresh token using the ```makeNewRefreshTokenRequest``` method.
+using the returned `AppleAuthorizationToken` object. After that you can verify if the user is 
+still logged in using "Sign in with Apple" by retrieving a refresh token using the `makeNewRefreshTokenRequest` method.
 
 ```java
         public class AppleIdTokenManager {
@@ -44,14 +44,14 @@ still logged in using "Sign in with Apple" by retrieving a refresh token using t
             private static final String REDIRECT_URL = "Your redirect url";
         
             public static void main(String[] args) throws IOException, InvalidKeySpecException {
-                //Generating your private key.
-                //This could be just a string containing the key.
+                // Generating your private key.
+                // This could be just a string containing the key.
                 InputStream pkStream = AppleIdTokenManager.class
                         .getClassLoader().getResourceAsStream("your_pk_file.p8");
                 AppleClientPrivateKeyFactory appleClientPrivateKeyFactory = new AppleClientPrivateKeyFactory();
                 ECPrivateKey privateKey = appleClientPrivateKeyFactory.getEcPrivateKey(pkStream);
                 
-                //Creating provider instance.
+                // Creating provider instance.
                 SecretGenerator secretGenerator = new SecretGenerator();
                 AppleAuthProvider appleAuthProvider = new AppleAuthProvider(
                         CLIENT_ID,
@@ -63,17 +63,17 @@ still logged in using "Sign in with Apple" by retrieving a refresh token using t
                         REDIRECT_URL
                 );
                 
-                //We are ready to start using the provider.
+                // We are ready to start using the provider.
 
-                //Generate a url and navigate the user to it.
+                // Generate a url and navigate the user to it.
                 String loginLink = appleAuthProvider.getLoginLink("Some form of state");
                 
-                //Once the user is redirected back to our domain get the "code" in the request.
+                // Once the user is redirected back to our domain get the "code" in the request.
                 String authCode = "the code in the callback request";
-                //Now we can authenticate the user.
+                // Now we can authenticate the user.
                 AppleAuthorizationToken initialToken = appleAuthProvider.makeNewAuthorisationTokenRequest(authCode);
-                //After the authentication we should check (not more than once every once 24 hours) if the user still 
-                // logged in using "Sign in with Apple" by retrieving a refresh token.
+                // After the authentication we should check (not more than once every 24h) if the user 
+                // is still logged in using "Sign in with Apple" by retrieving a refresh token.
                 AppleAuthorizationToken refreshToken = appleAuthProvider.makeNewRefreshTokenRequest(initialToken
                         .getRefreshToken());
         
